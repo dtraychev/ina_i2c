@@ -55,7 +55,7 @@ module tb;
     );
 
     /* Test sequence */
-    // task send_data(input [15:0] data_in, input [6:0] addr_in);
+    // task write_data(input [15:0] data_in, input [6:0] addr_in);
     //     $display("%t Send data %h on address %h",$time, data_in, addr_in);
     //     rd_wr = 0;
     //     start = 1'b1;
@@ -67,8 +67,8 @@ module tb;
     //     $display("%t End of send task", $time);
     // endtask
 
-    task read_data(output [15:0] data_in, input [6:0] slv_addr_in, input [7:0] pointer_addr_in);
-        $display("%t Send data %h on address %h",$time, data_in, slv_addr);
+    task read_data(input [6:0] slv_addr_in, input [7:0] pointer_addr_in);
+        //$display("%t Send data %h on address %h",$time, data_in, slv_addr);
         data_valid = 0;
         start = 1'b1;
         pointer_addr = pointer_addr_in;
@@ -83,6 +83,8 @@ module tb;
         rd_wr = 1;
         #20
         start = 1'b0;
+        wait(eot);
+        $display("%t Slave addr: %0h, Read data: %0h", $time, slv_addr_in ,rx_data);
         $display("%t End of send task", $time);
     endtask
 
@@ -90,7 +92,7 @@ module tb;
     initial begin
         #100
         //send_data(8'h55, 7'hAA);
-        read_data(rx_data, 7'h40, 8'h81);
+        read_data(7'h01, 8'h81);
     end
 
     

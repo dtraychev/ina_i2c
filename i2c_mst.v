@@ -9,17 +9,18 @@ module i2c_master(
     output reg [15:0] data_out,
     input wire start,
     output reg eot, // End Of Transfer
-    input reg data_valid,
+    output reg data_valid,
     inout wire sda,
     output wire scl
 );
 
     `include "constants.vh"
 
-    reg [7:0] sm     ; // State Machine
-    reg [7:0] sm_r   ; // State Machine
-    reg [7:0] count  ;
-    reg       sda_out; 
+    reg [ 7:0] sm     ; // State Machine
+    reg [ 7:0] sm_r   ; // State Machine
+    reg [ 7:0] count  ;
+    reg        sda_out; 
+    reg [15:0] rd_data;
 
     reg scl_enable = 0; // SCL enable
     reg scl_enable_r = 0; // SCL enable
@@ -27,6 +28,7 @@ module i2c_master(
 
     assign scl = (scl_enable == 0) ? 1 : ~clk;
     assign sda = (sda_oe) ? sda_out : 1'bZ;
+    assign data_out = (eot) ? rd_data : 16'h0;
 
     always @ (negedge clk) begin
         if(rst) begin
@@ -76,6 +78,7 @@ module i2c_master(
             case (sm)
                 IDLE: begin
                     sda_out <= 1;
+                    eot <= 0;
                     if(start == 1) begin
                         count <= 1;
                         sm <= START;
@@ -160,14 +163,14 @@ module i2c_master(
                         sda_oe <= 1;
                         sda_out <= 0; // ACK
                         // if (rd_wr) begin
-                            data_out[count+8] <= sda;
+                            rd_data[count+8] <= sda;
                         // end
                         // else begin
                         //     //sda_out <= data_in[count];
                         // end
                     end
                     else if (rd_wr) begin
-                        data_out[count+8] <= sda;
+                        rd_data[count+8] <= sda;
                     end
                     else begin
                         sda_out <= data_in[count+8];
@@ -181,14 +184,14 @@ module i2c_master(
                         sda_oe <= (rd_wr) ? 1 : 0;
                         sda_out <= 0; // ACK
                         // if (rd_wr) begin
-                            data_out[count] <= sda;
+                            rd_data[count] <= sda;
                         // end
                         // else begin
                         //     //sda_out <= data_in[count];
                         // end
                     end
                     else if (rd_wr) begin
-                        data_out[count-1] <= sda;
+                        rd_data[count] <= sda;
                     end
                     else begin
                         sda_out <= data_in[count-1];
@@ -206,7 +209,7 @@ module i2c_master(
                     // end
 
                     if (sm_r == DATA) begin
-                        count <= 8;
+                        count <= 7;
                         sda_oe <= (rd_wr) ? 0 : 1;
                         sm <= SEC_DATA;
                     end

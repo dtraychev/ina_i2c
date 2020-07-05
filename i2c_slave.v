@@ -34,12 +34,14 @@ module i2c_slave(
     always @ (negedge sda) begin
         if(scl) begin
             start <= 1;
+            stop  <= 0;
         end
     end
 
-    always @ (posedge sda) begin
-        if(scl)
-            stop <= 1;
+    always @ (posedge scl) begin
+        if(!sda)
+            stop  <= 1;
+            start <= 0;
     end
 
 
@@ -62,7 +64,7 @@ module i2c_slave(
     //     end
     // end
 
-    always @(posedge clk) begin
+    always @(negedge clk) begin
         if (rst) begin
             sm <= IDLE;
             //addr <= 'h55;
@@ -171,17 +173,29 @@ module i2c_slave(
                 end
 
                 WAIT_ACK: begin
-                    count <= 8;
-                    sda_oe <= (rw) ? 1 : 0;
+                    if (rw) begin
+                        sda_oe <= 1;
+                        sda_out <= data_out[7];
+                        count <= 7;
+                    end
+                    else begin
+                        sda_oe <= 0;
+                        count <= 8;
+                    end
                     sm <= SEC_DATA;
                 end
 
                 SEC_DATA: begin
                     if (count == 0) begin
-                        sm <= (rw) ? SEC_DATA_ACK : ACK;
-                        data_rdy <= 1;
-                        sda_oe <= 0;
-//                        data_in_int[count] <= sda;
+                        if (rw) begin
+                            sm <= SEC_DATA_ACK;
+                            sda_oe <= 0;
+                            data_rdy <= 1;
+                        end
+                        else begin
+                            sm <= ACK;
+                            sda_oe <= 1;
+                        end
                     end
                     else begin
                         if (rw) begin
