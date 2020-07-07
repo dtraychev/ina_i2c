@@ -13,6 +13,7 @@ module i2c_slave(
 
     `include "constants.vh"
 
+    reg        clk_dev2 = 0;
     reg [7:0] sm;
     reg [6:0] addr;
     reg [15:0] data_in_int;
@@ -26,6 +27,7 @@ module i2c_slave(
     reg sda_out;
     reg data_rdy;
     reg [7:0] addr_pointer;
+    reg stop_det;
 
 
     assign sda = (sda_oe) ? sda_out : 1'bZ;
@@ -33,15 +35,48 @@ module i2c_slave(
 
     always @ (negedge sda) begin
         if(scl) begin
-            start <= 1;
-            stop  <= 0;
+            start = 1;
+            stop  = 0;
         end
     end
 
-    always @ (posedge scl) begin
-        if(!sda)
-            stop  <= 1;
-            start <= 0;
+    // always @ (posedge scl) begin
+    //     if (sda == 0) begin
+    //         stop_det = 1;
+    //     end
+    // end
+    
+    // always @ (posedge clk_dev2) begin
+    //     if (stop_det == 1 && sda == 1) begin
+    //         start = 0;
+    //         stop  = 1;
+    //     end
+    //     else begin
+    //         stop_det = 0;
+    //     end
+    // end
+
+
+    always @ (posedge clk_dev2 && sda) begin
+        if (scl == 1) begin
+            stop  = 1;
+            start = 0;
+        end
+    end
+
+    // always @ (negedge clk_dev2) begin
+    //     if (sda == 0) begin
+    //         @(posedge clk_dev2) begin
+    //             if(sda == 1) begin
+    //                 stop  <= 1;
+    //                 start <= 0;
+    //             end
+    //         end
+    //     end
+    // end
+
+    always @ (negedge clk) begin
+        clk_dev2 = ~clk_dev2;
     end
 
 
@@ -64,14 +99,12 @@ module i2c_slave(
     //     end
     // end
 
-    always @(negedge clk) begin
+    always @(negedge clk_dev2) begin
         if (rst) begin
             sm <= IDLE;
             //addr <= 'h55;
             //data_in_int <= 8'haa;
             count <= 8'd0;
-            start <= 0;
-            stop  <= 0;
             scl_enable <= 0;
             rw <= 0;
             sda_oe <= 0;
@@ -81,8 +114,7 @@ module i2c_slave(
             case (sm)
                 IDLE: begin
                     if(start) begin
-                        count <= 6;
-                        sm <= ADDR;
+                        sm <= START;
                     end
                 end
 
@@ -145,8 +177,7 @@ module i2c_slave(
                         addr_pointer[count] <= sda;
                         sda_oe <= 1;
                         sda_out <= 0; // Second ACK
-                        count <= 1;
-                        sm <= WAIT_STOP;
+                        sm <= WAIT_SEC_ACK;
                     end
                     else begin
                         addr_pointer[count] <= sda;
@@ -154,25 +185,43 @@ module i2c_slave(
                     end
                 end
 
+                WAIT_SEC_ACK: begin
+                    if (rw) begin
+                        count <= 8;
+                        sda_oe <= 1;
+                    end
+                    else begin
+                        count <= 7;
+                        sda_oe <= 0;
+                    end
+                    sm <= DATA;
+                end
+
                 DATA: begin
                     if (count == 0) begin
-                        sm <= (rw) ? WAIT_ACK : ACK;
-                        data_rdy <= 1;
-                        sda_oe <= 0;
-//                        data_in_int[count] <= sda;
+                        if (rw) begin
+                            sda_oe <= 0;
+                        end
+                        else begin
+                            sda_oe <= 1;
+                        end
+                        sm <= DATA_ACK;
+                       data_in_int[count+8] <= sda;
                     end
                     else begin
                         if (rw) begin
                             sda_out <= data_out[8+count-1];
                         end
                         else begin
+                            if(stop)
+                                sm <= WAIT_STOP;
                             data_in_int[8+count] <= sda;
                         end
                     end
                     count <= count -1;
                 end
 
-                WAIT_ACK: begin
+                DATA_ACK: begin
                     if (rw) begin
                         sda_oe <= 1;
                         sda_out <= data_out[7];
@@ -180,7 +229,7 @@ module i2c_slave(
                     end
                     else begin
                         sda_oe <= 0;
-                        count <= 8;
+                        count <= 7;
                     end
                     sm <= SEC_DATA;
                 end
@@ -188,13 +237,14 @@ module i2c_slave(
                 SEC_DATA: begin
                     if (count == 0) begin
                         if (rw) begin
-                            sm <= SEC_DATA_ACK;
                             sda_oe <= 0;
                             data_rdy <= 1;
+                            sm <= SEC_DATA_ACK;
                         end
                         else begin
-                            sm <= ACK;
+                            data_in_int[count] <= sda;
                             sda_oe <= 1;
+                            sm <= SEC_DATA_ACK;
                         end
                     end
                     else begin
@@ -211,18 +261,15 @@ module i2c_slave(
                 SEC_DATA_ACK: begin
                     sda_oe <= 0;
                     count <= 1;
+                    data_rdy <= 1;
                     sm <= WAIT_STOP;
                 end
 
                 WAIT_STOP: begin
                     sda_oe <= 0;
-                    if (count == 0) begin
-                        if (stop)
-                            sm <= IDLE;
-                    end
-                    else begin
-                        count <= count - 1;
-                    end
+                    count <= 0;
+                    if (stop)
+                        sm <= IDLE;
                 end
             endcase
         end

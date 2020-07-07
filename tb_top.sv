@@ -2,6 +2,7 @@
 module tb;
     
     reg clk;
+    reg clk_2;
     reg reset;
     reg [15:0] rx_data;
     reg [15:0] tx_data;
@@ -17,12 +18,14 @@ module tb;
 
     initial begin
         clk = 0;
+        clk_2 = 0;
         reset = 1;
         #40
         reset = 0;
     end
     
     always clk = #10 ~clk;
+    always clk_2 = #5 ~clk_2;
 
     initial begin
         if (reset) begin
@@ -33,7 +36,7 @@ module tb;
     end
 
     i2c_master tb_master(
-        .clk      (clk),
+        .clk      (clk_2),
         .rst      (reset),
         .rd_wr    (rd_wr),
         .data_in  (tx_data),
@@ -51,21 +54,23 @@ module tb;
         .rst (reset),
         .sda (sda),
         .scl (scl),
-        .clk (clk)
+        .clk (clk_2)
     );
 
     /* Test sequence */
-    // task write_data(input [15:0] data_in, input [6:0] addr_in);
-    //     $display("%t Send data %h on address %h",$time, data_in, addr_in);
-    //     rd_wr = 0;
-    //     start = 1'b1;
-    //     #20
-    //     start = 1'b0;
-    //     tx_data = data_in;
-    //     addr = addr_in;
-    //     wait(eot);
-    //     $display("%t End of send task", $time);
-    // endtask
+    task write_data(input [15:0] write_data, input [7:0] pointer_addr_in, input [6:0] slv_addr_in);
+        $display("%t Send data %h on address %h",$time, write_data, pointer_addr_in);
+        data_valid = 1;
+        rd_wr = 0;
+        start = 1'b1;
+        tx_data = write_data;
+        pointer_addr = pointer_addr_in;
+        slv_addr = slv_addr_in;
+        #20
+        start = 1'b0;
+        wait(eot);
+        $display("%t End of send task", $time);
+    endtask
 
     task read_data(input [6:0] slv_addr_in, input [7:0] pointer_addr_in);
         //$display("%t Send data %h on address %h",$time, data_in, slv_addr);
@@ -91,7 +96,8 @@ module tb;
 
     initial begin
         #100
-        //send_data(8'h55, 7'hAA);
+        write_data(16'h3955, 8'hAA, 7'h01);
+        #200
         read_data(7'h01, 8'h81);
     end
 

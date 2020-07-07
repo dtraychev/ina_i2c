@@ -14,3 +14,4 @@ localparam NOP_INPUT     = 11;
 localparam SLV_ADDR_ACK  = 12;
 localparam SEC_DATA      = 13;
 localparam SEC_DATA_ACK  = 14;
+localparam DATA_ACK      = 15;
