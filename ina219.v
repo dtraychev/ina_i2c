@@ -85,15 +85,13 @@ module ina219(
                 else if (address == 'h02)
                     tx_data <= voltage_reg;
                 else if (address == 'h03) begin
-                    current_reg  <= (shunt_reg*calibration_reg)/4096;
-                    tx_data <=  current_reg ;
+                    tx_data <=  power_reg;
                 end
                 else if (address == 'h04) begin
-                    power_reg  <= (current_reg*voltage_reg )/5000;
-                    tx_data <=  power_reg ;
+                    tx_data <= current_reg;
                     end
                 else if (address == 'h05)
-                    tx_data <= calibration_reg ;
+                    tx_data <= calibration_reg;
             end
 
             // Limit Shunt register value corresponging to the PGA value
@@ -107,6 +105,9 @@ module ina219(
                 2'h2  : shunt_reg <= {{2{v_shunt[15]}},v_shunt[13:0]};
                 2'h3  : shunt_reg <= {v_shunt[15],v_shunt[14:0]};
             endcase 
+            
+            current_reg  <= (shunt_reg*calibration_reg)/4096;
+            power_reg  <= (current_reg*voltage_reg )/5000;
         end
     end
 endmodule
