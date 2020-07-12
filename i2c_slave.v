@@ -33,18 +33,26 @@ module i2c_slave(
     reg addr_rdy;
     reg p_valid;
 
+    // Signal that slave address read is ready
     assign addr_valid = addr_rdy;
+    // Set slave address and wr outputs
     assign slave_addr = (addr_rdy) ? slv_addr : 8'h0;
     assign write_en = (addr_rdy) ? ~rw : 1'b0;
 
+    // Signal that pointer address read is ready
     assign pointer_valid = p_valid;
+    // Set address pointer output
     assign pointer = (p_valid) ? addr_pointer : 8'h0;
 
+    // Signal that data read is ready
     assign data_valid = data_rdy;
+    // Set read data otput
     assign rx_data = (data_rdy && ~rw) ? data_in_int : 16'bx;
 
+    // Make sda output/input
     assign sda = (sda_oe) ? sda_out : 1'bZ;
 
+    // Valid signals conditions
     always @ (posedge clk) begin
         if (rst) begin
             data_rdy <= 0;
@@ -72,6 +80,7 @@ module i2c_slave(
         end
     end
     
+    // Detect START condition
     always @ (negedge sda) begin
         if(scl) begin
             start = 1;
@@ -79,23 +88,7 @@ module i2c_slave(
         end
     end
 
-    // always @ (posedge scl) begin
-    //     if (sda == 0) begin
-    //         stop_det = 1;
-    //     end
-    // end
-    
-    // always @ (posedge clk_dev2) begin
-    //     if (stop_det == 1 && sda == 1) begin
-    //         start = 0;
-    //         stop  = 1;
-    //     end
-    //     else begin
-    //         stop_det = 0;
-    //     end
-    // end
-
-
+    // Detect STOP condition
     always @ (posedge clk_dev2 && sda) begin
         if (scl == 1) begin
             stop  = 1;
@@ -103,41 +96,12 @@ module i2c_slave(
         end
     end
 
-    // always @ (negedge clk_dev2) begin
-    //     if (sda == 0) begin
-    //         @(posedge clk_dev2) begin
-    //             if(sda == 1) begin
-    //                 stop  <= 1;
-    //                 start <= 0;
-    //             end
-    //         end
-    //     end
-    // end
-
+    // Generate clock for I2C Slave state maching. Main clock devided by 2.
     always @ (negedge clk) begin
-        clk_dev2 = ~clk_dev2;
+        clk_dev2 = ~clk_dev2; // 400KHz
     end
 
-
-    // always @ (posedge clk) begin
-    //     if (rst) begin
-    //         sda_oe <= 0;
-    //     end
-    //     else begin
-    //         if(sm == DATA || sm == WAIT_SEC_ACK) begin
-    //             if (rd_wr) begin
-    //                 sda_oe <= 1; // If RD, SDA is input
-    //             end
-    //             else begin
-    //                 sda_oe <= 0; // If WR, SDA is output
-    //             end
-    //         end
-    //         else begin
-    //             sda_oe <= 0;
-    //         end
-    //     end
-    // end
-
+    // I2C State machine
     always @(negedge clk_dev2) begin
         if (rst) begin
             sm <= IDLE;
@@ -190,7 +154,6 @@ module i2c_slave(
                         sm  <= ADDR_POINTER;
                     end
                     else if (count == 2) begin
-                       // addr_rdy <= 1;
                         if(sda == 1) begin
                             rw <= 1; // Read
                             count <= 8;

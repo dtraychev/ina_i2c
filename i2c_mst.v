@@ -9,7 +9,7 @@ module i2c_master(
     output reg [15:0] data_out,
     input wire start,
     output reg eot, // End Of Transfer
-    input reg data_valid,
+    input reg data_valid, // 1 when there is data to write, else 0
     inout wire sda,
     output wire scl
 );
@@ -30,6 +30,8 @@ module i2c_master(
     assign sda = (sda_oe) ? sda_out : 1'bZ;
     assign data_out = (eot) ? rd_data : 16'h0;
 
+    // Generate clock for I2C master state machine. Main clock devided by 2.
+    // 400KHz
     always @ (negedge clk) begin
         clk_dev2 = ~clk_dev2;
     end
@@ -47,15 +49,8 @@ module i2c_master(
             else begin
                 scl_enable <= 1;
             end
-            //sm_r <= sm;
          end
     end
-
-    // always @ (negedge clk_dev2) begin
-    //     if(sm==STOP)
-    //         scl_enable_r <= 0;
-    //     scl_enable <= scl_enable_r;
-    // end
 
     always @ (negedge clk) begin
         if (sm == STOP) begin
@@ -67,22 +62,9 @@ module i2c_master(
         if (rst) begin
             sda_oe <= 1;
         end
-//        sm_r <= sm;
-        // else begin
-        //     if(sm == DATA) begin
-        //         if (rd_wr) begin
-        //             sda_oe <= 0; // If RD, SDA is input
-        //         end
-        //         else begin
-        //             sda_oe <= 1; // If WR, SDA is output
-        //         end
-        //     end
-        //     else begin
-        //         sda_oe <= 1;
-        //     end
-        // end
     end
 
+    // I2C Master State machine
     always @(negedge clk_dev2) begin
         if (rst) begin
             sm      <= IDLE;
@@ -100,20 +82,12 @@ module i2c_master(
                         sda_out <= 0;
                         sm <= START;
                     end
-                    //eot <= 0;
                 end // IDLE
 
                 START: begin
-                    //if (count == 0) begin
-                       // scl_enable <= 1;
-                        sm <= ADDR;
-                        count <= 6;
-                    //end
-                    //else begin
-                     //   scl_enable <= 0;
-                        sda_out <= 0;
-                      //  count <= count - 1;
-                    //end
+                    sm <= ADDR;
+                    count <= 6;
+                    sda_out <= 0;
                 end // START
 
                 ADDR: begin
@@ -150,7 +124,7 @@ module i2c_master(
                 ADDR_POINTER: begin
                     if (count == 0) begin
                         sda_out <= pointer_addr[count];
-                        sm <= NOP_INPUT;
+                        sm <= NOP_INPUT; // TODO: Remove that state transition
                         sm_r <= WAIT_SEC_ACK;
                     end
                     else begin
