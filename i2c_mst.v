@@ -245,15 +245,9 @@ module i2c_master(
                     sm <= STOP;
                 end
 
-
                 STOP: begin
-                  //  if (count == 0) begin
                         eot <= 1;
                         sm <= IDLE;
-                    // end
-                    // else begin
-                    //     sda_out <= 0;
-                    // end
                 end // STOP
             endcase
         end
